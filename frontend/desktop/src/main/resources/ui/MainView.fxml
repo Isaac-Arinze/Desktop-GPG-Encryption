@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<BorderPane prefHeight="700.0" prefWidth="1000.0" xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml" fx:controller="com.cryptomanager.frontend.controller.MainController">
+    <top>
+        <MenuBar>
+            <menus>
+                <Menu text="File">
+                    <items>
+                        <MenuItem text="Import Keys" onAction="#onImportKeys" />
+                        <MenuItem text="Export Keys" onAction="#onExportKeys" />
+                        <SeparatorMenuItem />
+                        <MenuItem text="Exit" onAction="#onExit" />
+                    </items>
+                </Menu>
+                <Menu text="Tools">
+                    <items>
+                        <MenuItem text="Encrypt Text" onAction="#onOpenEncrypt" />
+                    </items>
+                </Menu>
+                <Menu text="Help">
+                    <items>
+                        <MenuItem text="About" onAction="#onAbout" />
+                    </items>
+                </Menu>
+            </menus>
+        </MenuBar>
+    </top>
+    <center>
+        <TabPane fx:id="mainTabs">
+            <tabs>
+                <Tab text="Encrypt" closable="false">
+                    <content>
+                        <VBox spacing="12.0">
+                            <padding>
+                                <Insets top="12.0" right="12.0" bottom="12.0" left="12.0"/>
+                            </padding>
+                            <Label text="Use Tools → Encrypt Text to encrypt any string with a passphrase." wrapText="true" />
+                        </VBox>
+                    </content>
+                </Tab>
+            </tabs>
+        </TabPane>
+    </center>
+</BorderPane>
