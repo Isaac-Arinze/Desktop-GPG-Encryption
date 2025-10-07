@@ -5,8 +5,10 @@ import java.util.Base64;
 import java.util.Optional;
 
 import com.cryptomanager.service.EncryptionService;
+import com.cryptomanager.service.KeyManagementService;
 import com.cryptomanager.service.exception.CryptoServiceException;
 import com.cryptomanager.service.impl.SimpleEncryptionService;
+import com.cryptomanager.service.impl.SimpleKeyManagementService;
 import com.cryptomanager.service.model.DecryptionResult;
 import com.cryptomanager.service.model.EncryptionOptions;
 import com.cryptomanager.service.model.EncryptionResult;
@@ -23,6 +25,7 @@ public class MainController {
     private TabPane mainTabs;
 
     private final EncryptionService encryptionService = new SimpleEncryptionService();
+    private final KeyManagementService keyManagementService = new SimpleKeyManagementService();
 
     @FXML
     public void initialize() {}
@@ -34,28 +37,45 @@ public class MainController {
 
     @FXML
     private void onOpenEncrypt(ActionEvent e) {
+        // Get text to encrypt
         TextInputDialog textDialog = new TextInputDialog();
-        textDialog.setTitle("Encrypt Text (OpenPGP Format)");
+        textDialog.setTitle("Encrypt Text (Symmetric Encryption)");
         textDialog.setHeaderText("Enter text to encrypt");
         Optional<String> textOpt = textDialog.showAndWait();
         if (textOpt.isEmpty()) return;
 
-        TextInputDialog passDialog = new TextInputDialog();
-        passDialog.setTitle("Passphrase");
-        passDialog.setHeaderText("Enter passphrase");
-        Optional<String> passOpt = passDialog.showAndWait();
-        if (passOpt.isEmpty()) return;
+        // Get encryption passphrase (symmetric encryption for now)
+        TextInputDialog passphraseDialog = new TextInputDialog();
+        passphraseDialog.setTitle("Encryption Passphrase");
+        passphraseDialog.setHeaderText("Enter passphrase for symmetric encryption");
+        passphraseDialog.setContentText("Passphrase:");
+        Optional<String> passphraseOpt = passphraseDialog.showAndWait();
+        if (passphraseOpt.isEmpty()) return;
 
         try {
-            // Use AES-GCM (the only supported algorithm)
+            String passphrase = passphraseOpt.get().trim();
+            if (passphrase.isEmpty()) {
+                Alert a = new Alert(Alert.AlertType.ERROR);
+                a.setTitle("Invalid Passphrase");
+                a.setHeaderText("Passphrase cannot be empty");
+                a.showAndWait();
+                return;
+            }
+
+            // Use the encryption service with passphrase as key ID
             EncryptionOptions opts = EncryptionOptions.builder()
-                    .keyId(passOpt.get())
+                    .keyId(passphrase)
+                    .asciiArmor(true)
                     .build();
 
-            EncryptionResult result = encryptionService.encrypt(textOpt.get().getBytes(StandardCharsets.UTF_8), "AES-GCM", opts);
+            EncryptionResult result = encryptionService.encrypt(
+                textOpt.get().getBytes(StandardCharsets.UTF_8),
+                "AES-GCM",
+                opts
+            );
 
             // Save to file
-            TextInputDialog fileDialog = new TextInputDialog("encrypted-message.txt");
+            TextInputDialog fileDialog = new TextInputDialog("encrypted-message.txt.asc");
             fileDialog.setTitle("Save Encrypted File");
             fileDialog.setHeaderText("Enter filename for encrypted output");
             fileDialog.setContentText("Filename:");
@@ -67,10 +87,9 @@ public class MainController {
                     filename += ".asc";
                 }
 
-                // Convert to ASCII armored format if needed
+                // Add ASCII armor for better compatibility
                 String output = new String(result.getEncryptedData(), StandardCharsets.UTF_8);
                 if (!output.contains("-----BEGIN PGP MESSAGE-----")) {
-                    // Add ASCII armor
                     output = "-----BEGIN PGP MESSAGE-----\n" +
                             "Version: CryptoManager v0.1.0\n" +
                             "\n" +
@@ -81,23 +100,27 @@ public class MainController {
                 java.nio.file.Files.write(java.nio.file.Paths.get(filename), output.getBytes(StandardCharsets.UTF_8));
 
                 Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
-                successAlert.setTitle("OpenPGP Encryption Complete");
-                successAlert.setHeaderText("Encrypted data saved successfully!");
-                successAlert.setContentText("File saved as: " + filename + "\n\nThis file is compatible with GPG tools.\nFormat: OpenPGP Message (ASCII armored)");
+                successAlert.setTitle("Symmetric Encryption Complete");
+                successAlert.setHeaderText("File encrypted successfully!");
+                successAlert.setContentText("File saved as: " + filename +
+                    "\n\n✅ Encrypted with passphrase" +
+                    "\n🔓 Use the same passphrase to decrypt" +
+                    "\n📧 Share this file with the recipient");
                 successAlert.showAndWait();
             } else {
                 // Show in dialog if no file save
                 String output = new String(result.getEncryptedData(), StandardCharsets.UTF_8);
                 Alert a = new Alert(Alert.AlertType.INFORMATION);
-                a.setTitle("OpenPGP Encrypted Output");
-                a.setHeaderText("OpenPGP Message Format");
+                a.setTitle("Symmetric Encrypted Output");
+                a.setHeaderText("OpenPGP Message (Symmetric Encrypted)");
                 a.getDialogPane().setContentText(output);
                 a.showAndWait();
             }
         } catch (CryptoServiceException ex) {
             Alert a = new Alert(Alert.AlertType.ERROR);
             a.setTitle("Encryption Error");
-            a.setHeaderText(ex.getMessage());
+            a.setHeaderText("Symmetric encryption failed");
+            a.setContentText(ex.getMessage() + "\n\nPlease check your passphrase and try again.");
             a.showAndWait();
         } catch (Exception ex) {
             Alert a = new Alert(Alert.AlertType.ERROR);
@@ -110,18 +133,21 @@ public class MainController {
 
     @FXML
     private void onOpenDecrypt(ActionEvent e) {
+        // Get encrypted file
         TextInputDialog fileDialog = new TextInputDialog();
-        fileDialog.setTitle("Decrypt File");
+        fileDialog.setTitle("Decrypt File (Symmetric)");
         fileDialog.setHeaderText("Enter path to encrypted file (.asc or .gpg)");
         fileDialog.setContentText("File path:");
         Optional<String> fileOpt = fileDialog.showAndWait();
         if (fileOpt.isEmpty()) return;
 
-        TextInputDialog passDialog = new TextInputDialog();
-        passDialog.setTitle("Passphrase");
-        passDialog.setHeaderText("Enter passphrase for decryption");
-        Optional<String> passOpt = passDialog.showAndWait();
-        if (passOpt.isEmpty()) return;
+        // Get decryption passphrase
+        TextInputDialog passphraseDialog = new TextInputDialog();
+        passphraseDialog.setTitle("Decryption Passphrase");
+        passphraseDialog.setHeaderText("Enter the passphrase used for encryption");
+        passphraseDialog.setContentText("Passphrase:");
+        Optional<String> passphraseOpt = passphraseDialog.showAndWait();
+        if (passphraseOpt.isEmpty()) return;
 
         try {
             java.nio.file.Path filePath = java.nio.file.Paths.get(fileOpt.get());
@@ -130,6 +156,15 @@ public class MainController {
                 a.setTitle("File Not Found");
                 a.setHeaderText("Encrypted file not found");
                 a.setContentText("Please check the file path and try again.");
+                a.showAndWait();
+                return;
+            }
+
+            String passphrase = passphraseOpt.get().trim();
+            if (passphrase.isEmpty()) {
+                Alert a = new Alert(Alert.AlertType.ERROR);
+                a.setTitle("Invalid Passphrase");
+                a.setHeaderText("Passphrase cannot be empty");
                 a.showAndWait();
                 return;
             }
@@ -152,9 +187,9 @@ public class MainController {
                 encryptedData = fileContent.getBytes(StandardCharsets.UTF_8);
             }
 
-            // Try to decrypt
+            // Use the same passphrase for decryption
             DecryptionResult result = ((com.cryptomanager.service.impl.SimpleEncryptionService) encryptionService)
-                    .decrypt(encryptedData, "AES-GCM", passOpt.get());
+                    .decrypt(encryptedData, "AES-GCM", passphrase);
 
             // Save decrypted content
             TextInputDialog outputDialog = new TextInputDialog("decrypted-output.txt");
@@ -168,16 +203,18 @@ public class MainController {
                 java.nio.file.Files.write(java.nio.file.Paths.get(outputFilename), result.getDecryptedData());
 
                 Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
-                successAlert.setTitle("Decryption Complete");
+                successAlert.setTitle("Symmetric Decryption Complete");
                 successAlert.setHeaderText("File decrypted successfully!");
-                successAlert.setContentText("Decrypted content saved as: " + outputFilename);
+                successAlert.setContentText("✅ Decrypted with passphrase" +
+                    "\n📄 Content saved as: " + outputFilename +
+                    "\n🔓 Used the same passphrase as for encryption");
                 successAlert.showAndWait();
             } else {
                 // Show in dialog
                 String decryptedText = new String(result.getDecryptedData(), StandardCharsets.UTF_8);
                 Alert a = new Alert(Alert.AlertType.INFORMATION);
                 a.setTitle("Decrypted Content");
-                a.setHeaderText("Decrypted Text");
+                a.setHeaderText("Symmetrically Decrypted Text");
                 a.setContentText(decryptedText);
                 a.showAndWait();
             }

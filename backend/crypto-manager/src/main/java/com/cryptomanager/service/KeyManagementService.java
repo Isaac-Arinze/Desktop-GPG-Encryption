@@ -1,8 +1,11 @@
 package com.cryptomanager.service;
 
-import com.cryptomanager.service.model.KeyPair;
-import com.cryptomanager.service.model.KeyMetadata;
 import com.cryptomanager.service.exception.CryptoServiceException;
+import com.cryptomanager.service.model.KeyMetadata;
+import com.cryptomanager.service.model.KeyPair;
+
+import java.security.PrivateKey;
+import java.security.PublicKey;
 
 /**
  * Key management service interface following SOLID principles.
@@ -11,84 +14,85 @@ import com.cryptomanager.service.exception.CryptoServiceException;
 public interface KeyManagementService {
 
     /**
-     * Generates a new key pair using the specified algorithm.
+     * Generates a new RSA key pair for OpenPGP operations.
      *
-     * @param algorithm The key algorithm to use (RSA, ECC, etc.)
-     * @param keySize The key size in bits
-     * @param keyId Optional identifier for the key pair
-     * @return KeyPair containing public and private keys with metadata
+     * @param keySize The key size in bits (e.g., 2048, 4096)
+     * @param keyId Unique identifier for the key pair
+     * @param passphrase Optional passphrase for private key encryption
+     * @return KeyMetadata containing key information
      * @throws CryptoServiceException if key generation fails
      */
-    KeyPair generateKeyPair(String algorithm, int keySize, String keyId)
-            throws CryptoServiceException;
+    KeyMetadata generateKeyPair(int keySize, String keyId, String passphrase) throws CryptoServiceException;
 
     /**
-     * Generates a new key pair with default parameters.
+     * Generates a new RSA key pair with default settings.
      *
-     * @param algorithm The key algorithm to use
-     * @return KeyPair containing public and private keys with metadata
+     * @param keyId Unique identifier for the key pair
+     * @return KeyMetadata containing key information
      * @throws CryptoServiceException if key generation fails
      */
-    KeyPair generateKeyPair(String algorithm) throws CryptoServiceException;
+    KeyMetadata generateKeyPair(String keyId) throws CryptoServiceException;
 
     /**
-     * Stores a key pair securely.
-     *
-     * @param keyPair The key pair to store
-     * @param passphrase Optional passphrase for encryption
-     * @return KeyMetadata containing storage information
-     * @throws CryptoServiceException if storage fails
-     */
-    KeyMetadata storeKeyPair(KeyPair keyPair, String passphrase)
-            throws CryptoServiceException;
-
-    /**
-     * Retrieves a key pair by its identifier.
+     * Retrieves a key pair by its ID.
      *
      * @param keyId The key identifier
-     * @param passphrase Passphrase if the key was encrypted
-     * @return KeyPair containing the requested keys
-     * @throws CryptoServiceException if retrieval fails
+     * @param passphrase Passphrase for private key decryption
+     * @return KeyPair containing public and private keys
+     * @throws CryptoServiceException if key retrieval fails
      */
-    KeyPair retrieveKeyPair(String keyId, String passphrase)
-            throws CryptoServiceException;
+    KeyPair getKeyPair(String keyId, String passphrase) throws CryptoServiceException;
 
     /**
-     * Deletes a key pair by its identifier.
+     * Retrieves the public key for a given key ID.
      *
-     * @param keyId The key identifier to delete
-     * @throws CryptoServiceException if deletion fails
+     * @param keyId The key identifier
+     * @return PublicKey for encryption operations
+     * @throws CryptoServiceException if public key retrieval fails
      */
-    void deleteKeyPair(String keyId) throws CryptoServiceException;
+    PublicKey getPublicKey(String keyId) throws CryptoServiceException;
+
+    /**
+     * Exports a public key in OpenPGP-compatible format.
+     *
+     * @param keyId The key identifier
+     * @return Base64-encoded public key
+     * @throws CryptoServiceException if export fails
+     */
+    String exportPublicKey(String keyId) throws CryptoServiceException;
+
+    /**
+     * Imports a public key from OpenPGP format.
+     *
+     * @param publicKeyData Base64-encoded public key data
+     * @param keyId Identifier for the imported key
+     * @return KeyMetadata for the imported key
+     * @throws CryptoServiceException if import fails
+     */
+    KeyMetadata importPublicKey(String publicKeyData, String keyId) throws CryptoServiceException;
 
     /**
      * Lists all available key pairs.
      *
-     * @return Array of KeyMetadata for all stored keys
+     * @return Array of KeyMetadata for all keys
      * @throws CryptoServiceException if listing fails
      */
     KeyMetadata[] listKeys() throws CryptoServiceException;
 
     /**
-     * Exports a public key in the specified format.
+     * Deletes a key pair.
      *
-     * @param keyId The key identifier
-     * @param format The export format (PEM, DER, etc.)
-     * @return String containing the exported public key
-     * @throws CryptoServiceException if export fails
+     * @param keyId The key identifier to delete
+     * @param passphrase Passphrase for authorization
+     * @throws CryptoServiceException if deletion fails
      */
-    String exportPublicKey(String keyId, String format)
-            throws CryptoServiceException;
+    void deleteKey(String keyId, String passphrase) throws CryptoServiceException;
 
     /**
-     * Imports a key pair from external source.
+     * Checks if a key pair exists.
      *
-     * @param keyData The key data to import
-     * @param format The format of the key data
-     * @param keyId Optional identifier for the imported key
-     * @return KeyMetadata for the imported key
-     * @throws CryptoServiceException if import fails
+     * @param keyId The key identifier to check
+     * @return true if the key exists, false otherwise
      */
-    KeyMetadata importKey(String keyData, String format, String keyId)
-            throws CryptoServiceException;
+    boolean keyExists(String keyId);
 }

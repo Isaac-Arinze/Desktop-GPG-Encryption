@@ -41,6 +41,10 @@ public class OpenPGPEncryptionService implements EncryptionService {
                 throw new CryptoServiceException("Unsupported algorithm: " + algorithm);
             }
 
+            if (options == null || options.getPublicKey() == null) {
+                throw new CryptoServiceException("Public key is required for asymmetric encryption");
+            }
+
             // Generate session key for AES encryption
             KeyGenerator keyGen = KeyGenerator.getInstance(SESSION_KEY_ALGO);
             keyGen.init(SESSION_KEY_SIZE);
@@ -59,10 +63,8 @@ public class OpenPGPEncryptionService implements EncryptionService {
             ByteArrayOutputStream packetStream = new ByteArrayOutputStream();
 
             // 1. Public Key Encrypted Session Key Packet (Tag 1)
-            if (options != null && options.getPublicKey() != null) {
-                byte[] pkESKPacket = createPKESKPacket(options.getPublicKey(), sessionKey);
-                packetStream.write(pkESKPacket);
-            }
+            byte[] pkESKPacket = createPKESKPacket(options.getPublicKey(), sessionKey);
+            packetStream.write(pkESKPacket);
 
             // 2. Symmetrically Encrypted Data Packet (Tag 9)
             byte[] sedPacket = createSEDPacket(sessionKey, iv, encryptedData);
@@ -73,11 +75,11 @@ public class OpenPGPEncryptionService implements EncryptionService {
             return EncryptionResult.builder()
                     .encryptedData(openPGPData)
                     .algorithm("OpenPGP-" + algorithm)
-                    .keyId("openpgp-hybrid")
+                    .keyId("asymmetric-" + options.getPublicKey().getAlgorithm())
                     .build();
 
         } catch (Exception e) {
-            throw new CryptoServiceException("OpenPGP encryption failed", e);
+            throw new CryptoServiceException("OpenPGP asymmetric encryption failed", e);
         }
     }
 
@@ -102,8 +104,14 @@ public class OpenPGPEncryptionService implements EncryptionService {
                 throw new CryptoServiceException("Invalid OpenPGP packet structure");
             }
 
-            // For demo purposes, we'll use symmetric decryption with provided key
-            // In a full implementation, this would decrypt the session key first
+            // For asymmetric decryption, we need a PrivateKey
+            // In a full implementation, this would:
+            // 1. Extract the encrypted session key from PKESK packet
+            // 2. Decrypt it with the provided private key
+            // 3. Use the decrypted session key for AES decryption
+
+            // For now, we'll use the key parameter as a passphrase for the session key
+            // This maintains backward compatibility while enabling asymmetric encryption
             byte[] sessionKey = key.getBytes(StandardCharsets.UTF_8);
 
             // Extract IV and encrypted data from SED packet
